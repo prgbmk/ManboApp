@@ -1,44 +1,38 @@
 package com.test.mungipark.lolipop_project;
 
 import android.app.Activity;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.ServiceConnection;
 import android.os.Bundle;
+import android.os.IBinder;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.Button;
 import android.widget.TextView;
-import android.hardware.Sensor;
-import android.hardware.SensorEvent;
-import android.hardware.SensorEventListener;
-import android.hardware.SensorManager;
+
 import android.view.View;
 import android.view.View.OnClickListener;
 
-//import android.util.Log;//디버깅용 로그캣
+import android.util.Log;//디버깅용 로그캣
 
 
 
-public class MainActivity extends Activity implements SensorEventListener{
+public class MainActivity extends Activity{
 
     private Button jogstart;
     private Button manbo_reset;
+    private Intent intent;
 
-
-    private long lastTime;
-
-    private float speed;
-    private float lastX;
-    private float lastY;
-    private float lastZ;
-
-    private float x, y, z;
-
-    private static final int SHAKE_THRESHOLD = 800;
-
-    private SensorManager sensorManager;
-    private Sensor accelerormeterSensor;
+    //Initial mService
+    BackgroundService mService;//서비스 담을 객체(바인딩할 대상)
+    boolean mBound = false;
 
     private TextView man;
-    int manbo_count=0;//만보기 카운터
+    private int manbo_count=0;//만보기 카운터
+
+    private BackgroundService.Listener listener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -50,47 +44,73 @@ public class MainActivity extends Activity implements SensorEventListener{
         manbo_reset = (Button)findViewById(R.id.Jog_reset);
         man = (TextView)findViewById(R.id.Jog_Count_Text);
 
-        sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
 
-        //Sensor 객체에 가속도 센서를 가져온다.
-        accelerormeterSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-        man.setText("걸음 횟수 : "+manbo_count+"걸음");
+        man.setText("걸음 횟수 : " + manbo_count + "걸음");
 
-        manbo_reset.setOnClickListener(new OnClickListener(){//만보계 리셋
-            public void onClick(View v){
-                manbo_count=0;
-                man.setText("걸음 횟수 : "+manbo_count+"걸음");
+        manbo_reset.setOnClickListener(new OnClickListener() {//만보계 리셋
+            public void onClick(View v) {
+                //BackgroundService 중단
+                stopService(intent);
+            }
+        });
+        jogstart.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                //매개변수 : 변수이름, 전달내용
+                intent.putExtra("Command", "서비스에 전달할 내용");
+                startService(intent);
             }
         });
 
 
     }
 
+
     @Override
     public void onStart() {
 
         super.onStart();
-
-        if (accelerormeterSensor != null)
-
-            sensorManager.registerListener(this, accelerormeterSensor,
-
-                    SensorManager.SENSOR_DELAY_NORMAL);
-
+        //Intent : 여러 Activity간 데이터 주고 받는데 쓰는 객체이다.
+        intent = new Intent(this, BackgroundService.class);//intent 선언(대상은 BackgroundService Class)
+        //BackgroundService Class와 바인드(연결)한다.
+        bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
     }
+    //Defines callbacks for service binding.
+    private ServiceConnection mConnection = new ServiceConnection(){
+
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            BackgroundService.LocalBinder binder = (BackgroundService.LocalBinder) service;
+            mService = binder.getService();//BackgroundService 자체를 바인딩 연결함.
+            mBound = true;
+
+            //커스텀 리스너로 걸음걸이 MainActivity에 갱신.(UI 간접 접근)
+            listener = new BackgroundService.Listener() {
+                @Override
+                public void onValueChanged(int count) {
+                    man.setText("걸음 횟수 : " + String.valueOf(count) + "걸음");
+                }
+            };
+            mService.setOnValueChanged(listener);//BackgroundService의 리스너와 연결
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            mBound = false;
+        }
+    };
 
 
     @Override
     public void onStop() {
 
         super.onStop();
-
-        if (sensorManager != null)
-
-            sensorManager.unregisterListener((SensorEventListener) this);
+        if(mBound){
+            unbindService(mConnection);
+            mBound = false;
+        }
 
     }
-
 
 
     @Override
@@ -113,56 +133,6 @@ public class MainActivity extends Activity implements SensorEventListener{
         }
 
         return super.onOptionsItemSelected(item);
-    }
-
-    @Override
-    public void onAccuracyChanged(Sensor sensor, int accuracy) {
-
-    }
-
-    @SuppressWarnings("deprecation")
-    @Override
-    public void onSensorChanged(SensorEvent event) {
-
-        if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
-
-            long currentTime = System.currentTimeMillis();
-
-            long gabOfTime = (currentTime - lastTime);
-
-            if (gabOfTime > 100) {
-
-                lastTime = currentTime;
-                //각 축 센서 [0] = x 축, [1] = y 축, [2] = z 축
-                x = event.values[0];
-
-                y = event.values[1];
-
-                z = event.values[2];
-
-                speed = Math.abs(x + y + z - lastX - lastY - lastZ) /
-
-
-                        gabOfTime * 10000;
-
-                if (speed > SHAKE_THRESHOLD) {
-                    manbo_count++;
-                    man.setText("걸음 횟수 : " +manbo_count+"걸음");
-
-                    // 일정 변위 변동량 초과!
-
-                }
-
-                lastX = event.values[0];
-
-                lastY = event.values[1];
-
-                lastZ = event.values[2];
-
-            }
-
-        }
-
     }
 
 }
