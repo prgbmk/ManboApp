@@ -57,7 +57,6 @@ public class MainActivity extends Activity{
             @Override
             public void onClick(View v) {
                 //매개변수 : 변수이름, 전달내용
-                intent.putExtra("Command", "서비스에 전달할 내용");
                 startService(intent);
             }
         });

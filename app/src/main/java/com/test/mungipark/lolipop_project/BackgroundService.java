@@ -69,8 +69,7 @@ public class BackgroundService extends Service implements SensorEventListener{
 
     }
     public int onStartCommand(Intent intent, int flags, int startID){
-        String command = intent.getStringExtra("Command");
-        Log.d("Background Service : ", "onStartCommand() 호출 : " + command);
+
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
         //Sensor 객체에 가속도 센서를 가져온다.
         accelerormeterSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
