@@ -33,6 +33,7 @@ public class BackgroundService extends Service implements SensorEventListener{
     private SensorManager sensorManager;
     private Sensor accelerormeterSensor;
 
+
     //센서값 바뀐걸 넘겨주기위한 리스너 정의 구간.
     private Listener myListener;
 
@@ -42,6 +43,7 @@ public class BackgroundService extends Service implements SensorEventListener{
 
     public void setOnValueChanged(Listener listener){//리스너 연결구간
         this.myListener = listener;
+
     }
 
     public void onValueChanged(int count){
@@ -49,7 +51,7 @@ public class BackgroundService extends Service implements SensorEventListener{
     }
     //리스너 정의 끝.
 
-    //바인더 - 센서값 전송하기 위한 통신
+    //바인더 - 센서값 전송하기 위한 통신 컴포넌트에 반환된다.
     private final IBinder mBinder = new LocalBinder();
 
     //MainActivity에서 이 메소드를 호출하면 이 클래스 자체를 넘겨준다.
@@ -140,6 +142,11 @@ public class BackgroundService extends Service implements SensorEventListener{
             }
 
         }
+    }
+
+    //만보계 값 카운터 넘겨주는 함수.
+    public int getCount(){
+        return manbo_count;
     }
 
     @Override

@@ -20,6 +20,10 @@
                 android:enabled="true"
                 android:exported ="true" >
         </service>
+        <service android:name=".DBupdateService"
+                android:enabled="true"
+                android:exported="true">
+        </service>
     </application>
     <uses-permission android:name="android.permission.INTERNET"/>
 

@@ -1,6 +1,8 @@
 package com.test.mungipark.lolipop_project;
 
 import android.app.Activity;
+import android.app.AlarmManager;
+import android.app.PendingIntent;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -36,12 +38,14 @@ import java.util.Calendar;
  *
  */
 
-public class MainActivity extends Activity{
+public class MainActivity extends Activity {
 
     private Button jogstart;
     private Button manbo_reset;
     private Button db_Btn;
     private Intent intent;
+    private Intent dbUpdate_intent;//DB업로드용 클래스랑 연결할 intent
+    private PendingIntent pendingIntent;//Alarm용 pendingintent
 
     private String DB_Result;
     private String[] DB_data;//DB_data[0] - date | DB_date[1] - Count
@@ -57,12 +61,16 @@ public class MainActivity extends Activity{
     private TextView dbTxt;//D 확인용
 
 
-    private int manbo_count=0;//만보기 카운터
+    private int manbo_count = 0;//만보기 카운터
 
+    //알람매니저 선언 : 해당 시간에 만보계 누적값을 보내기 위해
+    AlarmManager alarmManager;
+
+    //커스텀 리스너 사용
     private BackgroundService.Listener listener;
 
     //Defines callbacks for service binding.
-    private ServiceConnection mConnection = new ServiceConnection(){
+    private ServiceConnection mConnection = new ServiceConnection() {
 
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
@@ -97,14 +105,35 @@ public class MainActivity extends Activity{
             output = ShowData();
             return output;
         }
+
         //UI Update
-        protected void onPostExecute(String tmp){
+        protected void onPostExecute(String tmp) {
             setDBResult(DB_data);
         }
     }
 
-    //DB데이터 읽는 함수(해당 날짜의 데이터만 읽어오기) - AsyncTask 스레드에 탐재할 함수
-    private String ShowData(){
+    /*
+    //만보계 정보(날짜, 걸음걸이수) 넣는 스레드 메소드.
+    private class inputDB extends AsyncTask<Void, Void, String> {
+
+        @Override
+        // 백그라운드에서 작업할 작업을 지시함
+        protected String doInBackground(Void... params) {
+            String output;
+            Log.d("Input DB 작업 : ", "실행완료");
+            output = InsertData();
+            return output;
+        }
+
+        protected void onPostExecute(String temp) {
+
+
+        }
+    }
+    */
+
+    //DB데이터 읽는 메소드(해당 날짜의 데이터만 읽어오기) - AsyncTask 스레드에 탐재할 함수
+    private String ShowData() {
         URL url = null;
         try {
             //url = new URL("http://192.168.0.104/show_data_date.php");
@@ -134,7 +163,7 @@ public class MainActivity extends Activity{
             BufferedReader reader = new BufferedReader(tmp);
             StringBuilder builder = new StringBuilder();
             String str;
-            while((str = reader.readLine()) != null){
+            while ((str = reader.readLine()) != null) {
                 builder.append(str + "\n");
             }
             DB_Result = builder.toString();
@@ -148,25 +177,77 @@ public class MainActivity extends Activity{
 
         } catch (MalformedURLException e) {
             e.printStackTrace();
-        } catch (IOException e){
+        } catch (IOException e) {
 
         }
 
         return DB_Result;
     }
 
+    /*
+    //DB데이터 쓰는 함수 - AsyncTask 스레드에 탐재할 함수
+    private String InsertData() {
+        URL url = null;
+        try {
+            url = new URL("http://192.168.0.103/insert_menu(Manbo).php");
+
+            HttpURLConnection http = (HttpURLConnection) url.openConnection();//php접속
+
+            http.setDefaultUseCaches(false);
+            http.setDoInput(true);//서버 읽기 모드
+            http.setDoOutput(true);//서버 쓰기 모드
+            http.setRequestMethod("POST");//POST방식 전송(보안용)
+            http.setRequestProperty("content-type", "application/x-www-form-urlencoded");
+
+            //php에 파라미터 넘겨주는 작업 시작.
+            StringBuffer buffer = new StringBuffer();
+            buffer.append("date").append("=").append(get_Date().toString()).append("&");
+            buffer.append("walk").append("=").append(manbo_count);
+
+            //Php에 파라미터 값 넘기기
+            OutputStreamWriter outStream = new OutputStreamWriter(http.getOutputStream(), "UTF-8");
+            PrintWriter writer = new PrintWriter(outStream);
+            writer.write(buffer.toString());
+            writer.flush();
+
+            //파라미터값 넘기고나서 나오는 결과 받기
+            InputStreamReader tmp = new InputStreamReader(http.getInputStream(), "UTF-8");
+            BufferedReader reader = new BufferedReader(tmp);
+            StringBuilder builder = new StringBuilder();
+            String str;
+            while ((str = reader.readLine()) != null) {
+                builder.append(str + "\n");
+            }
+
+            DB_Result = builder.toString();
+
+
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+
+        }
+
+        return DB_Result;
+    }
+    */
+
     //날짜 받아오는 함수 : 20150518 이런식으로.
-    private String get_Date(){
-        if(Integer.valueOf(Calendar.getInstance().get(Calendar.MONTH) + 1) >=10){
-            return String.valueOf(Calendar.getInstance().get(Calendar.YEAR) +
-                    (Calendar.getInstance().get(Calendar.MONTH) + 1) +
-                    Calendar.getInstance().get(Calendar.DAY_OF_MONTH));
+    private String get_Date() {
+        String temp;
+        if (Integer.valueOf(Calendar.getInstance().get(Calendar.MONTH) + 1) < 10) {
+            temp = String.valueOf(Calendar.getInstance().get(Calendar.YEAR) + "0" +
+                    (Calendar.getInstance().get(Calendar.MONTH) + 1));
+        } else {
+            temp = String.valueOf(Calendar.getInstance().get(Calendar.YEAR) +
+                    (Calendar.getInstance().get(Calendar.MONTH) + 1));
         }
-        else{
-            return  String.valueOf(Calendar.getInstance().get(Calendar.YEAR) + "0" +
-                    (Calendar.getInstance().get(Calendar.MONTH) + 1) +
-                    Calendar.getInstance().get(Calendar.DAY_OF_MONTH));
+        if (Integer.valueOf(Calendar.getInstance().get(Calendar.DAY_OF_MONTH)) < 10) {
+            temp = temp + "0" + String.valueOf(Calendar.getInstance().get(Calendar.DAY_OF_MONTH));
+        } else {
+            temp = temp + String.valueOf(Calendar.getInstance().get(Calendar.DAY_OF_MONTH));
         }
+        return temp;
     }
 
     @Override
@@ -185,6 +266,7 @@ public class MainActivity extends Activity{
 
         manboTxt.setText("걸음 횟수 : " + manbo_count + "걸음");
         timeTxt.setText(get_Date());
+
 
         manbo_reset.setOnClickListener(new OnClickListener() {//만보계 리셋
             public void onClick(View v) {
@@ -213,8 +295,9 @@ public class MainActivity extends Activity{
     //UI Update Method
     private void setDBResult(String[] result){
         dbTxt.setText(result[0]);
-        dbTxt.append("에는 ");
+        dbTxt.append("에 ");
         dbTxt.append(result[1]);
+        dbTxt.append("만큼 걸었습니다");
     }
 
     @Override
@@ -223,8 +306,16 @@ public class MainActivity extends Activity{
         super.onStart();
         //Intent : 여러 Activity간 데이터 주고 받는데 쓰는 객체이다.
         intent = new Intent(this, BackgroundService.class);//intent 선언(대상은 BackgroundService Class)
+
         //BackgroundService Class와 바인드(연결)한다.
         bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
+
+        //알람
+        dbUpdate_intent = new Intent(this, DBupdateService.class);//DB Update Intent와 연결
+        pendingIntent = PendingIntent.getService(MainActivity.this, 0, dbUpdate_intent, 0);
+        alarmManager = (AlarmManager)getSystemService(Context.ALARM_SERVICE);
+        alarmManager.setRepeating(AlarmManager.RTC_WAKEUP, Calendar.getInstance().getTimeInMillis(), 10 * 1000, pendingIntent);
+
     }
 
     @Override
@@ -235,6 +326,7 @@ public class MainActivity extends Activity{
             unbindService(mConnection);
             mBound = false;
         }
+        alarmManager.cancel(pendingIntent);
 
     }
 
