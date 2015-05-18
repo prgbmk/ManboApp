@@ -27,12 +27,11 @@ public class DBupdateService extends Service{
 
     private String DB_Result;
     private int Count;
-    private Intent intent;
 
     BackgroundService mService;
     boolean mBound = false;
 
-
+    //Local Binding 셋업.
     private ServiceConnection mConnection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
@@ -50,16 +49,14 @@ public class DBupdateService extends Service{
 
     public void onCreate(){
         super.onCreate();
-        Log.d("DBUpdate Service ", "OnCreat()를 호출");
-        intent = new Intent(this, BackgroundService.class);
+        //BackgroundService와 바인딩
+        Intent intent = new Intent(this, BackgroundService.class);
         bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
     }
 
     public int onStartCommand(Intent intent, int flags, int startID){
 
-
         new inputDB().execute();
-
         return super.onStartCommand(intent, flags, startID);
     }
 
@@ -87,7 +84,7 @@ public class DBupdateService extends Service{
 
     //DB데이터 쓰는 함수 - AsyncTask 스레드에 탐재할 함수
     private String InsertData() {
-        URL url = null;
+        URL url;
         try {
             url = new URL("http://192.168.0.103/insert_menu(Manbo).php");
 
@@ -126,28 +123,35 @@ public class DBupdateService extends Service{
         } catch (MalformedURLException e) {
             e.printStackTrace();
         } catch (IOException e) {
-
+            Log.d("Insert Exception ", e.toString());
         }
-
         return DB_Result;
     }
 
     //날짜 받아오는 함수 : 20150518 이런식으로.
     private String get_Date() {
         String temp;
-        if (Integer.valueOf(Calendar.getInstance().get(Calendar.MONTH) + 1) < 10) {
+        int compare_i;//0~9숫자는 00 01 02 이런 식으로 붙여야 하니까 비교할 인트 변수.
+        Calendar cal;
+        cal = Calendar.getInstance();
+        compare_i = cal.get(Calendar.MONTH) + 1;
+
+        if (compare_i < 10) {
             temp = String.valueOf(Calendar.getInstance().get(Calendar.YEAR) + "0" +
                     (Calendar.getInstance().get(Calendar.MONTH) + 1));
         } else {
             temp = String.valueOf(Calendar.getInstance().get(Calendar.YEAR) +
                     (Calendar.getInstance().get(Calendar.MONTH) + 1));
         }
-        if (Integer.valueOf(Calendar.getInstance().get(Calendar.DAY_OF_MONTH)) < 10) {
+        compare_i = cal.get(Calendar.DAY_OF_MONTH);
+
+        if (compare_i < 10) {
             temp = temp + "0" + String.valueOf(Calendar.getInstance().get(Calendar.DAY_OF_MONTH));
         } else {
             temp = temp + String.valueOf(Calendar.getInstance().get(Calendar.DAY_OF_MONTH));
         }
         return temp;
+
     }
 
 

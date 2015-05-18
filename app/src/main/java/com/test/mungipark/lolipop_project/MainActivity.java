@@ -19,7 +19,6 @@ import android.view.View;
 import android.view.View.OnClickListener;
 
 import android.util.Log;//디버깅용 로그캣
-import android.widget.Toast;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -29,7 +28,6 @@ import java.io.PrintWriter;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.text.DateFormat;
 import java.util.Calendar;
 
 /**
@@ -106,31 +104,11 @@ public class MainActivity extends Activity {
             return output;
         }
 
-        //UI Update
+        //UI Update - AsyncTask가 작업을 마쳤을 때 UI갱신.
         protected void onPostExecute(String tmp) {
             setDBResult(DB_data);
         }
     }
-
-    /*
-    //만보계 정보(날짜, 걸음걸이수) 넣는 스레드 메소드.
-    private class inputDB extends AsyncTask<Void, Void, String> {
-
-        @Override
-        // 백그라운드에서 작업할 작업을 지시함
-        protected String doInBackground(Void... params) {
-            String output;
-            Log.d("Input DB 작업 : ", "실행완료");
-            output = InsertData();
-            return output;
-        }
-
-        protected void onPostExecute(String temp) {
-
-
-        }
-    }
-    */
 
     //DB데이터 읽는 메소드(해당 날짜의 데이터만 읽어오기) - AsyncTask 스레드에 탐재할 함수
     private String ShowData() {
@@ -172,82 +150,43 @@ public class MainActivity extends Activity {
             tempDB_str = DB_Result.split("\n");
             DB_data = tempDB_str[1].split(String.valueOf("[*]"));
 
-
             Log.d("show_data_date(Manbo).php <Date>", DB_Result);
 
         } catch (MalformedURLException e) {
             e.printStackTrace();
         } catch (IOException e) {
-
+            Log.d("Show_data Exception: ", e.toString());
         }
 
         return DB_Result;
     }
 
-    /*
-    //DB데이터 쓰는 함수 - AsyncTask 스레드에 탐재할 함수
-    private String InsertData() {
-        URL url = null;
-        try {
-            url = new URL("http://192.168.0.103/insert_menu(Manbo).php");
 
-            HttpURLConnection http = (HttpURLConnection) url.openConnection();//php접속
-
-            http.setDefaultUseCaches(false);
-            http.setDoInput(true);//서버 읽기 모드
-            http.setDoOutput(true);//서버 쓰기 모드
-            http.setRequestMethod("POST");//POST방식 전송(보안용)
-            http.setRequestProperty("content-type", "application/x-www-form-urlencoded");
-
-            //php에 파라미터 넘겨주는 작업 시작.
-            StringBuffer buffer = new StringBuffer();
-            buffer.append("date").append("=").append(get_Date().toString()).append("&");
-            buffer.append("walk").append("=").append(manbo_count);
-
-            //Php에 파라미터 값 넘기기
-            OutputStreamWriter outStream = new OutputStreamWriter(http.getOutputStream(), "UTF-8");
-            PrintWriter writer = new PrintWriter(outStream);
-            writer.write(buffer.toString());
-            writer.flush();
-
-            //파라미터값 넘기고나서 나오는 결과 받기
-            InputStreamReader tmp = new InputStreamReader(http.getInputStream(), "UTF-8");
-            BufferedReader reader = new BufferedReader(tmp);
-            StringBuilder builder = new StringBuilder();
-            String str;
-            while ((str = reader.readLine()) != null) {
-                builder.append(str + "\n");
-            }
-
-            DB_Result = builder.toString();
-
-
-        } catch (MalformedURLException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-
-        }
-
-        return DB_Result;
-    }
-    */
 
     //날짜 받아오는 함수 : 20150518 이런식으로.
     private String get_Date() {
         String temp;
-        if (Integer.valueOf(Calendar.getInstance().get(Calendar.MONTH) + 1) < 10) {
+        int compare_i;//0~9숫자는 00 01 02 이런 식으로 붙여야 하니까 비교할 인트 변수.
+        Calendar cal;
+        cal = Calendar.getInstance();
+        compare_i = cal.get(Calendar.MONTH) + 1;
+
+        if (compare_i < 10) {
             temp = String.valueOf(Calendar.getInstance().get(Calendar.YEAR) + "0" +
                     (Calendar.getInstance().get(Calendar.MONTH) + 1));
         } else {
             temp = String.valueOf(Calendar.getInstance().get(Calendar.YEAR) +
                     (Calendar.getInstance().get(Calendar.MONTH) + 1));
         }
-        if (Integer.valueOf(Calendar.getInstance().get(Calendar.DAY_OF_MONTH)) < 10) {
+        compare_i = cal.get(Calendar.DAY_OF_MONTH);
+
+        if (compare_i < 10) {
             temp = temp + "0" + String.valueOf(Calendar.getInstance().get(Calendar.DAY_OF_MONTH));
         } else {
             temp = temp + String.valueOf(Calendar.getInstance().get(Calendar.DAY_OF_MONTH));
         }
         return temp;
+
     }
 
     @Override
@@ -272,6 +211,8 @@ public class MainActivity extends Activity {
             public void onClick(View v) {
                 //BackgroundService 중단
                 stopService(intent);
+                alarmManager.cancel(pendingIntent);//타이머중단
+
             }
         });
         jogstart.setOnClickListener(new OnClickListener() {
@@ -290,6 +231,10 @@ public class MainActivity extends Activity {
                 //dbTxt.setText(DB_Result);
             }
         });
+
+        //알람 설정 및 실행.
+        setAlarm();
+
     }
 
     //UI Update Method
@@ -309,25 +254,47 @@ public class MainActivity extends Activity {
 
         //BackgroundService Class와 바인드(연결)한다.
         bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
+    }
 
-        //알람
+    //알람 셋팅용 메소드. -> 정해진 시간에 DB업로드.
+    private void setAlarm(){
+        //알람 셋팅 및 설정
+        Calendar executeCal = Calendar.getInstance();
+        Calendar currentCal = Calendar.getInstance();
+
         dbUpdate_intent = new Intent(this, DBupdateService.class);//DB Update Intent와 연결
         pendingIntent = PendingIntent.getService(MainActivity.this, 0, dbUpdate_intent, 0);
-        alarmManager = (AlarmManager)getSystemService(Context.ALARM_SERVICE);
-        alarmManager.setRepeating(AlarmManager.RTC_WAKEUP, Calendar.getInstance().getTimeInMillis(), 10 * 1000, pendingIntent);
 
+        alarmManager = (AlarmManager)getSystemService(Context.ALARM_SERVICE);
+
+        //알람 실행할 시간 설정. -> 오후 11시로 설정.
+        executeCal.set(Calendar.AM_PM, Calendar.PM);
+        executeCal.set(Calendar.HOUR, 11);
+        executeCal.set(Calendar.MINUTE, 00);
+        executeCal.set(Calendar.SECOND, 00);
+
+        //시간 차
+        long intendedTime = executeCal.getTimeInMillis();
+        long currentTime = currentCal.getTimeInMillis();
+
+        //조건에 따라 알람 셋팅을 달리함
+        if(intendedTime >= currentTime){//아직 의도한 시간이 안 됐을 때 -> 오늘 의도된 시간에 울리도록 알람매니저 셋팅.
+            alarmManager.setInexactRepeating(AlarmManager.RTC_WAKEUP, intendedTime, AlarmManager.INTERVAL_DAY, pendingIntent);
+        }
+        else{//의도한 시간을 넘었을 때 -> 다음 날에 알람을 울리도록 알람매니저 셋팅.
+            executeCal.add(Calendar.DAY_OF_MONTH, 1);
+            intendedTime = executeCal.getTimeInMillis();
+            alarmManager.setInexactRepeating(AlarmManager.RTC_WAKEUP, intendedTime, AlarmManager.INTERVAL_DAY, pendingIntent);
+        }
     }
 
     @Override
     public void onStop() {
-
         super.onStop();
         if(mBound){
             unbindService(mConnection);
             mBound = false;
         }
-        alarmManager.cancel(pendingIntent);
-
     }
 
 
